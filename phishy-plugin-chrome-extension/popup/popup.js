@@ -20,37 +20,17 @@
         const label = document.querySelector(".form-select").value;
         document.getElementById("exampleFormControlTextarea1").value = "";
         // document.querySelector(".form-select").value="";
-        // Create a new FormData object and add the form data to it
-  
+          // Feedback writes require a trusted server-side API key and are not
+          // submitted from the public extension.
         if (url.length < 5) {
         const te = document.getElementById("toast_e");
           te.classList.add("show");
           const s = document.getElementById("spin");
           s.classList.add("d-none");
         } else {
-          const formData = new FormData();
-          formData.append("url", url);
-          formData.append("label", label);
-          // Send the form data to the API endpoint using fetch
-          fetch("https://phishy.azurewebsites.net/add_data", {
-            method: "POST",
-            body: formData,
-          })
-            .then((response) => response.text())
-            .then((result) => {
-              console.log(result);
-              const ts = document.getElementById("toast_s");
-              ts.classList.add("show");
-              const s = document.getElementById("spin");
-              s.classList.add("d-none");
-            })
-            .catch((error) => {
-              console.log("error", error);
-              const te = document.getElementById("toast_e");
-              te.classList.add("show");
-              const s = document.getElementById("spin");
-              s.classList.add("d-none");
-            });
+          const te = document.getElementById("toast_e");
+          te.classList.add("show");
+          s.classList.add("d-none");
         }
       });
         
@@ -89,17 +69,15 @@
   else {
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
         var currentTabUrl = tabs[0].url;
-        console.log(currentTabUrl);
 
         // Retrieve data from chrome.storage.sync
-        chrome.storage.sync.get(currentTabUrl, function (result) {
+        chrome.storage.session.get(currentTabUrl, function (result) {
           // console.log(result);
           if (result[currentTabUrl]) {
             const percent =
               Math.round(
                 (result[currentTabUrl]["safe"] * 100 + Number.EPSILON) * 100
               ) / 100;
-            console.log(percent);
             const matter = document.getElementById("matter");
             const per = document.getElementById("percent");
             const glow = document.getElementById("glow");

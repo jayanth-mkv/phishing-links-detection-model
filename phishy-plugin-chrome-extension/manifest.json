@@ -1,10 +1,11 @@
 {
   "name": "Phishy",
-  "description": "Phishy helps in detects the Phishing Links in your website.",
+  "description": "Local research companion for the phishing URL scoring API.",
   "version": "1.0",
   "author": "JayanthMKV",
   "manifest_version": 3,
   "permissions": ["tabs", "notifications", "storage"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -21,7 +22,7 @@
   },
   "content_scripts": [
     {
-      "js": ["scripts/contentscript.js","scripts/utils.js"],
+      "js": ["scripts/contentscript.js"],
       "matches": ["<all_urls>"]
     }
   ],

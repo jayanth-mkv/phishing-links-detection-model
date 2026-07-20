@@ -16,7 +16,6 @@
     if (urls.length > 5) {
       urls = urls.slice(0, 5);
     }
-    console.log(urls);
     
     chrome.runtime.sendMessage(
       {
@@ -24,7 +23,6 @@
         urls: urls,
       },
       function (response) {
-        console.log("Message sent to popup script:", response);
       }
     );
     
@@ -146,7 +144,6 @@
     sendResponse
   ) {
     if (message.type === "showSafeMessage") {
-      console.log("Message received from background script:", message);
       
       // addDiv(message)
       createToast(message)
@@ -158,7 +155,6 @@
       // });
     }
     if (message.type === "showErrorMessage") {
-      console.log("Message received from background script:", message);
       
       // addDiv(message);
       createToast(message);

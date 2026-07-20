@@ -1,52 +1,27 @@
 import ipaddress
 import re
-from urllib.request import urlopen
 from bs4 import BeautifulSoup
-from socket import gethostbyname
-import requests
-from googlesearch import search
-from whois import whois
+import os
 from datetime import date
 from urllib.parse import urlparse
-from concurrent.futures import ThreadPoolExecutor
+from url_security import FetchedPage, resolve_public_host, safe_fetch, validate_public_url
 
 class FeatureExtraction:
     features = []
     def __init__(self,url):
         self.features = []
-        self.url = url
+        self.url = validate_public_url(url)
         self.domain = ""
         self.whois_response = ""
-        self.urlparse = ""
-        self.response = ""
-        self.soup = ""
+        self.urlparse = urlparse(self.url)
+        self.domain = self.urlparse.hostname or ""
+        self.resolved_ips = resolve_public_host(self.domain)
+        self.response = FetchedPage()
+        self.soup = BeautifulSoup("", 'html.parser')
 
-        with ThreadPoolExecutor() as executor:
-            future_response = executor.submit(requests.get, url)
-            try:
-                print(future_response.result())
-            except:
-                pass
-            else:
-                self.response = future_response.result()
-                self.soup = BeautifulSoup(self.response.text, 'html.parser')
-
-        # try:
-        #     self.response = requests.get(url)
-        #     self.soup = BeautifulSoup(self.response.text, 'html.parser')
-        # except:
-        #     pass
-
-        try:
-            self.urlparse = urlparse(url)
-            self.domain = self.urlparse.netloc
-        except:
-            pass
-
-        try:
-            self.whois_response = whois(self.domain)
-        except:
-            pass
+        if os.getenv("ENABLE_NETWORK_FEATURES", "false").lower() in {"1", "true", "yes"}:
+            self.response = safe_fetch(self.url)
+            self.soup = BeautifulSoup(self.response.text, 'html.parser')
 
 
         
@@ -89,7 +64,7 @@ class FeatureExtraction:
      # 1.UsingIp
     def UsingIp(self):
         try:
-            ipaddress.ip_address(self.url)
+            ipaddress.ip_address(self.domain)
             return -1
         except:
             return 1
@@ -194,8 +169,7 @@ class FeatureExtraction:
     # 11. NonStdPort
     def NonStdPort(self):
         try:
-            port = self.domain.split(":")
-            if len(port)>1:
+            if self.urlparse.port not in {None, 80, 443}:
                 return -1
             return 1
         except:
@@ -213,6 +187,7 @@ class FeatureExtraction:
     # 13. RequestURL
     def RequestURL(self):
         try:
+            i, success = 0, 0
             for img in self.soup.find_all('img', src=True):
                 dots = [x.start(0) for x in re.finditer('\.', img['src'])]
                 if self.url in img['src'] or self.domain in img['src'] or len(dots) == 1:
@@ -322,7 +297,7 @@ class FeatureExtraction:
     # 17. InfoEmail
     def InfoEmail(self):
         try:
-            if re.findall(r"[mail\(\)|mailto:?]", self.soap):
+            if re.findall(r"mailto:|mail\(", str(self.soup), re.IGNORECASE):
                 return -1
             else:
                 return 1
@@ -429,37 +404,18 @@ class FeatureExtraction:
 
     # 26. WebsiteTraffic   
     def WebsiteTraffic(self):
-        try:
-            rank = BeautifulSoup(urlopen("http://data.alexa.com/data?cli=10&dat=s&url=" + self.url).read(), "xml").find("REACH")['RANK']
-            if (int(rank) < 100000):
-                return 1
-            return 0
-        except :
-            return -1
+        # The historical Alexa endpoint is retired. Preserve the model's
+        # unavailable-feature sentinel rather than calling an untrusted service.
+        return -1
 
     # 27. PageRank
     def PageRank(self):
-        try:
-            prank_checker_response = requests.post("https://www.checkpagerank.net/index.php", {"name": self.domain})
-
-            global_rank = int(re.findall(r"Global Rank: ([0-9]+)", prank_checker_response.text)[0])
-            if global_rank > 0 and global_rank < 100000:
-                return 1
-            return -1
-        except:
-            return -1
+        return -1
             
 
     # 28. GoogleIndex
     def GoogleIndex(self):
-        try:
-            site = search(self.url, 5)
-            if site:
-                return 1
-            else:
-                return -1
-        except:
-            return 1
+        return -1
 
     # 29. LinksPointingToPage
     def LinksPointingToPage(self):
@@ -479,13 +435,15 @@ class FeatureExtraction:
         try:
             url_match = re.search(
         'at\.ua|usa\.cc|baltazarpresentes\.com\.br|pe\.hu|esy\.es|hol\.es|sweddy\.com|myjino\.ru|96\.lt|ow\.ly', self.url)
-            ip_address = gethostbyname(self.domain)
-            ip_match = re.search('146\.112\.61\.108|213\.174\.157\.151|121\.50\.168\.88|192\.185\.217\.116|78\.46\.211\.158|181\.174\.165\.13|46\.242\.145\.103|121\.50\.168\.40|83\.125\.22\.219|46\.242\.145\.98|'
-                                '107\.151\.148\.44|107\.151\.148\.107|64\.70\.19\.203|199\.184\.144\.27|107\.151\.148\.108|107\.151\.148\.109|119\.28\.52\.61|54\.83\.43\.69|52\.69\.166\.231|216\.58\.192\.225|'
-                                '118\.184\.25\.86|67\.208\.74\.71|23\.253\.126\.58|104\.239\.157\.210|175\.126\.123\.219|141\.8\.224\.221|10\.10\.10\.10|43\.229\.108\.32|103\.232\.215\.140|69\.172\.201\.153|'
-                                '216\.218\.185\.162|54\.225\.104\.146|103\.243\.24\.98|199\.59\.243\.120|31\.170\.160\.61|213\.19\.128\.77|62\.113\.226\.131|208\.100\.26\.234|195\.16\.127\.102|195\.16\.127\.157|'
-                                '34\.196\.13\.28|103\.224\.212\.222|172\.217\.4\.225|54\.72\.9\.51|192\.64\.147\.141|198\.200\.56\.183|23\.253\.164\.103|52\.48\.191\.26|52\.214\.197\.72|87\.98\.255\.18|209\.99\.17\.27|'
-                                '216\.38\.62\.18|104\.130\.124\.96|47\.89\.58\.141|78\.46\.211\.158|54\.86\.225\.156|54\.82\.156\.19|37\.157\.192\.102|204\.11\.56\.48|110\.34\.231\.42', ip_address)
+            ip_pattern = (
+                '146\.112\.61\.108|213\.174\.157\.151|121\.50\.168\.88|192\.185\.217\.116|78\.46\.211\.158|181\.174\.165\.13|46\.242\.145\.103|121\.50\.168\.40|83\.125\.22\.219|46\.242\.145\.98|'
+                + '107\.151\.148\.44|107\.151\.148\.107|64\.70\.19\.203|199\.184\.144\.27|107\.151\.148\.108|107\.151\.148\.109|119\.28\.52\.61|54\.83\.43\.69|52\.69\.166\.231|216\.58\.192\.225|'
+                + '118\.184\.25\.86|67\.208\.74\.71|23\.253\.126\.58|104\.239\.157\.210|175\.126\.123\.219|141\.8\.224\.221|10\.10\.10\.10|43\.229\.108\.32|103\.232\.215\.140|69\.172\.201\.153|'
+                + '216\.218\.185\.162|54\.225\.104\.146|103\.243\.24\.98|199\.59\.243\.120|31\.170\.160\.61|213\.19\.128\.77|62\.113\.226\.131|208\.100\.26\.234|195\.16\.127\.102|195\.16\.127\.157|'
+                + '34\.196\.13\.28|103\.224\.212\.222|172\.217\.4\.225|54\.72\.9\.51|192\.64\.147\.141|198\.200\.56\.183|23\.253\.164\.103|52\.48\.191\.26|52\.214\.197\.72|87\.98\.255\.18|209\.99\.17\.27|'
+                + '216\.38\.62\.18|104\.130\.124\.96|47\.89\.58\.141|78\.46\.211\.158|54\.86\.225\.156|54\.82\.156\.19|37\.157\.192\.102|204\.11\.56\.48|110\.34\.231\.42'
+            )
+            ip_match = any(re.search(ip_pattern, address) for address in self.resolved_ips)
             if url_match:
                 return -1
             elif ip_match:
